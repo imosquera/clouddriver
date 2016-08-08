@@ -16,6 +16,9 @@
 
 package com.netflix.spinnaker.clouddriver
 
+import com.netflix.spectator.api.Registry
+import com.netflix.spinnaker.clouddriver.metrics.config.MetricsConfiguration
+
 import com.netflix.spinnaker.clouddriver.aws.AwsConfiguration
 import com.netflix.spinnaker.clouddriver.azure.AzureConfiguration
 import com.netflix.spinnaker.clouddriver.cf.config.CloudFoundryConfig
@@ -49,6 +52,7 @@ import java.security.Security
   WebConfig,
   CloudDriverConfig,
   DeployConfiguration,
+  MetricsConfiguration,
   RetrofitConfig,
   AwsConfiguration,
   TitusConfiguration,

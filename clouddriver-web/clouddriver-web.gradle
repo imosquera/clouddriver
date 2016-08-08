@@ -30,6 +30,7 @@ dependencies {
   compile project(':clouddriver-openstack')
   compile project(':clouddriver-docker')
   compile project(':clouddriver-eureka')
+  compile project(':clouddriver-metrics')
 
   runtime spinnaker.dependency('kork')
   compile spinnaker.dependency('korkWeb')
