@@ -36,18 +36,28 @@ import spock.lang.Specification
 
 
 class TestMetric extends Metric {
-  Id my_id
-  Measurement[] my_measurements
+  Id myId
+  Measurement[] myMeasurements
+  boolean expired = false
 
   TestMetric(id, measures) {
-    my_id = id
-    my_measurements = measures
+    myId = id
+    myMeasurements = measures
   }
-  Id id() { return my_id }
+  Id id() { return myId }
   Iterable<Measurement> measure() {
-    return my_measurements
+    return Arrays.asList(myMeasurements)
   }
-  boolean hasExpired() { return false; }
+  boolean hasExpired() { return expired }
+}
+
+List<Measurement> toMeasurementList(array) {
+ List<Measurment> list = Arrays.toList(array)
+ return list
+}
+
+static Map<Id, List<Measurement>> toIdMap(map) {
+  return map
 }
 
 class MetricControllerSpec extends Specification {
@@ -62,10 +72,10 @@ class MetricControllerSpec extends Specification {
     controller = new MetricController()
     idA = DefaultId("idA")
     idB = DefaultId("idB")
-    idAXY = DefaultId("idA", new Tag[]{BasicTag("tagA", "X"), BasicTag("tagB", "Y")})
-    idAYX = DefaultId("idA", new Tag[]{BasicTag("tagA", "Y"), BasicTag("tagB", "X")})
-    idAXZ = DefaultId("idA", new Tag[]{BasicTag("tagA", "Y"), BasicTag("tagZ", "Z")})
-    idBXY = DefaultId("idB", new Tag[]{BasicTag("tagA", "X"), BasicTag("tagB", "Y")})
+    idAXY = DefaultId("idA", [BasicTag("tagA", "X"), BasicTag("tagB", "Y")])
+    idAYX = DefaultId("idA", [BasicTag("tagA", "Y"), BasicTag("tagB", "X")])
+    idAXZ = DefaultId("idA", [BasicTag("tagA", "Y"), BasicTag("tagZ", "Z")])
+    idBXY = DefaultId("idB", [BasicTag("tagA", "X"), BasicTag("tagB", "Y")])
 
     measureAXY = new Measurement(idAXY, 11, 11.11)
     measureAXY2 = new Measurement(idAYX, 10, 10.10)
@@ -74,11 +84,12 @@ class MetricControllerSpec extends Specification {
     meterA = new TestMeter("ignoreA", [measureAXY, measureAYX, measureAXZ])
     meterA2 = new TestMeter("ignoreA2", [measureAXY2])
     meterB = new TestMeter("ignoreB", [measureBXY])
+    null
   }
 
   void "collectDisjointValues"() {
     given:
-      collection = new Map<Id, List<Measurement>();
+      collection = new Map<Id, List<Measurement>>();
       namePattern = null
       tagNamePattern = null
       tagValuePattern = null
@@ -88,14 +99,14 @@ class MetricControllerSpec extends Specification {
         collection, meterA, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == [idAXY : [measureAXY],
-                     idAYX : [measureAYX],
-                     idAYZ : [measureAYZ]]
+      collection == toIdMap([idAXY : [measureAXY],
+                             idAYX : [measureAYX],
+                             idAYZ : [measureAYZ]])
   }
 
   void "collectRepeatedValues"() {
     given:
-      collection = new Map<Id, List<Measurement>();
+      collection = new Map<Id, List<Measurement>>();
       namePattern = null
       tagNamePattern = null
       tagValuePattern = null
@@ -107,14 +118,14 @@ class MetricControllerSpec extends Specification {
         collection, meterA2, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == [idAXY : [measureAXY, measureAXY2],
-                     idAYX : [measureAYX],
-                     idAYZ : [measureAYZ]]
+      collection == toIdMap([idAXY : [measureAXY, measureAXY2],
+                             idAYX : [measureAYX],
+                             idAYZ : [measureAYZ]])
   }
 
   void "collectSimilarMetrics"() {
     given:
-      collection = new Map<Id, List<Measurement>();
+      collection = new Map<Id, List<Measurement>>();
       namePattern = null
       tagNamePattern = null
       tagValuePattern = null
@@ -126,15 +137,15 @@ class MetricControllerSpec extends Specification {
         collection, meterB, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == [idAXY : [measureAXY],
-                     idBXY : [measureBXY],
-                     idAYX : [measureAYX],
-                     idAYZ : [measureAYZ]]
+      collection == toIdMap([idAXY : [measureAXY],
+                             idBXY : [measureBXY],
+                             idAYX : [measureAYX],
+                             idAYZ : [measureAYZ]])
   }
 
   void "collectFilteredName"() {
     given:
-      collection = new Map<Id, List<Measurement>();
+      collection = new Map<Id, List<Measurement>>();
       namePattern =  Pattern("idA")
       tagNamePattern = null
       tagValuePattern = null
@@ -146,14 +157,14 @@ class MetricControllerSpec extends Specification {
         collection, meterB, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == [idAXY : [measureAXY],
-                     idAYX : [measureAYX],
-                     idAXZ : [measureAXZ]
+      collection == toIdMap([idAXY : [measureAXY],
+                             idAYX : [measureAYX],
+                             idAXZ : [measureAXZ]])
   }
 
   void "collectFilteredTagName"() {
     given:
-      collection = new Map<Id, List<Measurement>();
+      collection = new Map<Id, List<Measurement>>();
       namePattern = null
       tagNamePattern = Pattern("tagZ")
       tagValuePattern = null
@@ -163,12 +174,12 @@ class MetricControllerSpec extends Specification {
         collection, meterA, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == [idAYZ : [measureAYZ]]
+      collection == toIdMap([idAYZ : [measureAYZ]])
   }
 
   void "collectFilteredTagValue"() {
     given:
-      collection = new Map<Id, List<Measurement>();
+      collection = new Map<Id, List<Measurement>>();
       namePattern = null
       tagNamePattern = null
       tagValuePattern = Pattern("X")
@@ -178,13 +189,13 @@ class MetricControllerSpec extends Specification {
         collection, meterA, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == [idAXY : [measureAXY],
-                     idAYX : [measureAYX]]
+      collection == toIdMap([idAXY : [measureAXY],
+                             idAYX : [measureAYX]])
   }
 
   void "collectNotFound"() {
     given:
-      collection = new Map<Id, List<Measurement>();
+      collection = new Map<Id, List<Measurement>>();
       namePattern = null
       tagNamePattern = Pattern("tagZ")
       tagValuePattern = Pattern("X")
@@ -194,6 +205,6 @@ class MetricControllerSpec extends Specification {
         collection, meterA, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == [:]
+      collection == toIdMap([:])
   }
 }
