@@ -98,6 +98,13 @@ public class MetricController {
         return "" + timestamp + " = " + value;
     }
 
+    public boolean equals(Object obj) {
+      if (obj == null) return false;
+      if (!(obj instanceof DataPoint)) return false;
+      DataPoint other = (DataPoint)obj;
+      return timestamp == other.timestamp && value == other.value;
+    }
+
     private long timestamp;
     private double value;
   };
@@ -112,6 +119,13 @@ public class MetricController {
     public TagValue(String key, String value) {
       this.key = key;
       this.value = value;
+    }
+
+    public boolean equals(Object obj) {
+      if (obj == null) return false;
+      if (!(obj instanceof TagValue)) return false;
+      TagValue other = (TagValue)obj;
+      return key.equals(other.key) && value.equals(other.value);
     }
 
     public String toString() {
@@ -129,7 +143,7 @@ public class MetricController {
     public static TaggedDataPoints make(Id id, List<Measurement> measurements,
                                         boolean aggregate) {
       List<TagValue> tags = new ArrayList<TagValue>();
-      List<DataPoint> data_points = new ArrayList<DataPoint>();
+      List<DataPoint> dataPoints = new ArrayList<DataPoint>();
       for (Tag tag : id.tags()) {
           tags.add(new TagValue(tag.key(), tag.value()));
       }
@@ -138,32 +152,41 @@ public class MetricController {
         for (Measurement measurement : measurements) {
            if (point == null) {
              point = DataPoint.make(measurement);
-             data_points.add(point);
+             dataPoints.add(point);
            } else {
              point.aggregate(measurement);
            }
         }
       } else {
         for (Measurement measurement : measurements) {
-          data_points.add(DataPoint.make(measurement));
+          dataPoints.add(DataPoint.make(measurement));
         }
       }
-      return new TaggedDataPoints(tags, data_points);
+      return new TaggedDataPoints(tags, dataPoints);
     }
 
     public Iterable<TagValue> getTags() { return tags; }
-    public Iterable<DataPoint> getValues() { return data_points; }
+    public Iterable<DataPoint> getValues() { return dataPoints; }
 
-    public TaggedDataPoints(List<TagValue> tags, List<DataPoint> data_points) {
+    public TaggedDataPoints(List<TagValue> tags, List<DataPoint> dataPoints) {
       this.tags = tags;
-      this.data_points = data_points;
+      this.dataPoints = dataPoints;
     }
 
     public String toString() {
-        return " TAGS={" + tags + "}, DATA={" + data_points + "}";
+        return "{TAGS={" + tags + "}, DATA={" + dataPoints + "}}";
     }
+
+    public boolean equals(Object obj) {
+      if (obj == null) return false;
+      if (!(obj instanceof TaggedDataPoints)) return false;
+
+      TaggedDataPoints other = (TaggedDataPoints)obj;
+      return tags == other.tags && dataPoints == other.dataPoints;
+    }
+
     private List<TagValue> tags;
-    private List<DataPoint> data_points;
+    private List<DataPoint> dataPoints;
   };
 
   /**
@@ -172,26 +195,40 @@ public class MetricController {
   public static class MetricValues {
     public static MetricValues make(String kind, List<Measurement> collection) {
       boolean aggregate = kind.equals("AggrMeter");
-      List<TaggedDataPoints> data_points = new ArrayList<TaggedDataPoints>();
-      data_points.add(TaggedDataPoints.make(collection.get(0).id(), collection, aggregate));
-      return new MetricValues(kind, data_points);
+      List<TaggedDataPoints> dataPoints = new ArrayList<TaggedDataPoints>();
+      dataPoints.add(TaggedDataPoints.make(collection.get(0).id(), collection, aggregate));
+      return new MetricValues(kind, dataPoints);
     }
 
     public String getKind() { return kind; }
-    public Iterable<TaggedDataPoints> getValues() { return data_points; }
+    public Iterable<TaggedDataPoints> getValues() { return dataPoints; }
 
     public void addMeasurements(String kind, List<Measurement> collection) {
       boolean aggregate = kind.equals("AggrMeter");
-      data_points.add(TaggedDataPoints.make(collection.get(0).id(), collection, aggregate));
+      dataPoints.add(TaggedDataPoints.make(collection.get(0).id(), collection, aggregate));
     }
 
-    public MetricValues(String kind, List<TaggedDataPoints> data_points) {
+    public MetricValues(String kind, List<TaggedDataPoints> dataPoints) {
       this.kind = kind;
-      this.data_points = data_points;
+      this.dataPoints = dataPoints;
+    }
+
+    public boolean equals(Object obj) {
+      if (obj == null) return false;
+      if (!(obj instanceof MetricValues)) return false;
+
+      // Ignore the kind because spectator internally transforms it
+      // into internal types that we cannot test against.
+      MetricValues other = (MetricValues)obj;
+      return dataPoints == other.dataPoints;
+    }
+
+    public String toString() {
+      return kind + dataPoints.toString();
     }
 
     private String kind;
-    private List<TaggedDataPoints> data_points;
+    private List<TaggedDataPoints> dataPoints;
   };
 
   /**

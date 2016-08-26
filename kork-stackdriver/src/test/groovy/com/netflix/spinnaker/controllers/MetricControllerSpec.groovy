@@ -14,103 +14,101 @@
  * limitations under the License.
  */
 
-package com.netflix.spinnaker.controllers
+// package com.netflix.spinnaker.controllers;
 
-import com.netflix.spinnaker.controllers.MetricController
+import com.netflix.spinnaker.controllers.MetricController;
 
-import com.netflix.spectator.api.ArrayTagSet;
+import com.netflix.spectator.api.BasicTag;
+import com.netflix.spectator.api.Clock;
 import com.netflix.spectator.api.DefaultCounter;
-import com.netflix.spectator.api.DefaultId;
+import com.netflix.spectator.api.DefaultTimer;
+import com.netflix.spectator.api.DefaultId as ApiDefaultId;
 import com.netflix.spectator.api.DefaultRegistry;
+import com.netflix.spectator.api.Id;
 import com.netflix.spectator.api.Meter;
 import com.netflix.spectator.api.Measurement;
 import com.netflix.spectator.api.Tag;
 
 import java.util.regex.Pattern
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneId
 
 import spock.lang.Shared
 import spock.lang.Specification
 
 
-class TestMetric extends Metric {
-  Id myId
-  Measurement[] myMeasurements
-  boolean expired = false
-
-  TestMetric(id, measures) {
-    myId = id
-    myMeasurements = measures
-  }
-  Id id() { return myId }
-  Iterable<Measurement> measure() {
-    return Arrays.asList(myMeasurements)
-  }
-  boolean hasExpired() { return expired }
-}
-
-List<Measurement> toMeasurementList(array) {
- List<Measurment> list = Arrays.toList(array)
- return list
-}
-
-static Map<Id, List<Measurement>> toIdMap(map) {
-  return map
-}
-
 class MetricControllerSpec extends Specification {
-  @Shared
-  MetricController controller
+  static class TestMeter extends Meter {
+    Id myId
+    Measurement[] myMeasurements
+    boolean expired = false
 
-  def setup() {
-    millis = 12345L
-    clock = Clock.fixed(Instance.ofEpochMilli(millis), ZoneId.systemDefault())
+    TestMeter(name, measures) {
+      myId = new ApiDefaultId(name)
+      myMeasurements = measures
+    }
+    Id id() { return myId }
+    Iterable<Measurement> measure() {
+      return Arrays.asList(myMeasurements)
+    }
+    boolean hasExpired() { return expired }
+  }
 
-    registry = new DefaultRegistry(clock)
-    controller = new MetricController()
-    idA = DefaultId("idA")
-    idB = DefaultId("idB")
-    idAXY = DefaultId("idA", [BasicTag("tagA", "X"), BasicTag("tagB", "Y")])
-    idAYX = DefaultId("idA", [BasicTag("tagA", "Y"), BasicTag("tagB", "X")])
-    idAXZ = DefaultId("idA", [BasicTag("tagA", "Y"), BasicTag("tagZ", "Z")])
-    idBXY = DefaultId("idB", [BasicTag("tagA", "X"), BasicTag("tagB", "Y")])
+  MetricController controller = new MetricController()
+  Id idA = new ApiDefaultId("idA")
+  Id idB = new ApiDefaultId("idB")
+  Id idAXY = idA.withTag("tagA", "X").withTag("tagB", "Y")
+  Id idAYX = idA.withTag("tagA", "Y").withTag("tagB", "X")
+  Id idAXZ = idA.withTag("tagA", "Y").withTag("tagZ", "Z")
+  Id idBXY = idB.withTag("tagA", "X").withTag("tagB", "Y")
 
-    measureAXY = new Measurement(idAXY, 11, 11.11)
-    measureAXY2 = new Measurement(idAYX, 10, 10.10)
-    measureAYX = new Measurement(idAYX, 12, 12.12)
-    measureAXZ = new Measurement(idAXZ, 13, 13.13)
-    meterA = new TestMeter("ignoreA", [measureAXY, measureAYX, measureAXZ])
-    meterA2 = new TestMeter("ignoreA2", [measureAXY2])
-    meterB = new TestMeter("ignoreB", [measureBXY])
-    null
+  Measurement measureAXY = new Measurement(idAXY, 11, 11.11)
+  Measurement measureAXY2 = new Measurement(idAXY, 20, 20.20)
+  Measurement measureAYX = new Measurement(idAYX, 12, 12.12)
+  Measurement measureAXZ = new Measurement(idAXZ, 13, 13.13)
+  Measurement measureBXY = new Measurement(idBXY, 50, 50.50)
+
+  Meter meterA = new TestMeter("ignoreA", [measureAXY, measureAYX, measureAXZ])
+  Meter meterA2 = new TestMeter("ignoreA2", [measureAXY2])
+  Meter meterB = new TestMeter("ignoreB", [measureBXY])
+
+  long millis = 12345L
+  Clock clock = new Clock() {
+    long  wallTime() { return millis; }
+    long monotonicTime() { return millis; }
+  }
+
+  HashMap<Id, List<Measurement>> collection
+  Pattern namePattern
+  Pattern tagNamePattern
+  Pattern tagValuePattern
+
+  void setup() {
+    collection = new HashMap<Id, List<Measurement>>();
+    namePattern = null
+    tagNamePattern = null
+    tagValuePattern = null
+  }
+
+  List<Measurement> toMeasurementList(array) {
+    List<Measurement> list = Arrays.toList(array)
+    return list
+  }
+
+  static Map<Id, List<Measurement>> toIdMap(map) {
+    return new HashMap(map)
   }
 
   void "collectDisjointValues"() {
-    given:
-      collection = new Map<Id, List<Measurement>>();
-      namePattern = null
-      tagNamePattern = null
-      tagValuePattern = null
-
     when:
-      MetricController.collectValues(
+      List<Id> added = MetricController.collectValues(
         collection, meterA, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == toIdMap([idAXY : [measureAXY],
-                             idAYX : [measureAYX],
-                             idAYZ : [measureAYZ]])
+      collection ==  [(idAXY) : [measureAXY],
+                      (idAYX) : [measureAYX],
+                      (idAXZ) : [measureAXZ]]
   }
 
   void "collectRepeatedValues"() {
-    given:
-      collection = new Map<Id, List<Measurement>>();
-      namePattern = null
-      tagNamePattern = null
-      tagValuePattern = null
-
     when:
       MetricController.collectValues(
         collection, meterA, namePattern, tagNamePattern, tagValuePattern)
@@ -118,18 +116,12 @@ class MetricControllerSpec extends Specification {
         collection, meterA2, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == toIdMap([idAXY : [measureAXY, measureAXY2],
-                             idAYX : [measureAYX],
-                             idAYZ : [measureAYZ]])
+      collection == [(idAXY) : [measureAXY, measureAXY2],
+                     (idAYX) : [measureAYX],
+                     (idAXZ) : [measureAXZ]]
   }
 
   void "collectSimilarMetrics"() {
-    given:
-      collection = new Map<Id, List<Measurement>>();
-      namePattern = null
-      tagNamePattern = null
-      tagValuePattern = null
-
     when:
       MetricController.collectValues(
         collection, meterA, namePattern, tagNamePattern, tagValuePattern)
@@ -137,18 +129,15 @@ class MetricControllerSpec extends Specification {
         collection, meterB, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == toIdMap([idAXY : [measureAXY],
-                             idBXY : [measureBXY],
-                             idAYX : [measureAYX],
-                             idAYZ : [measureAYZ]])
+      collection == [(idAXY) : [measureAXY],
+                     (idBXY) : [measureBXY],
+                     (idAYX) : [measureAYX],
+                     (idAXZ) : [measureAXZ]]
   }
 
   void "collectFilteredName"() {
     given:
-      collection = new Map<Id, List<Measurement>>();
-      namePattern =  Pattern("idA")
-      tagNamePattern = null
-      tagValuePattern = null
+      namePattern = Pattern.compile("idA")
 
     when:
       MetricController.collectValues(
@@ -157,48 +146,40 @@ class MetricControllerSpec extends Specification {
         collection, meterB, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == toIdMap([idAXY : [measureAXY],
-                             idAYX : [measureAYX],
-                             idAXZ : [measureAXZ]])
+      collection == [(idAXY) : [measureAXY],
+                     (idAYX) : [measureAYX],
+                     (idAXZ) : [measureAXZ]]
   }
 
   void "collectFilteredTagName"() {
     given:
-      collection = new Map<Id, List<Measurement>>();
-      namePattern = null
-      tagNamePattern = Pattern("tagZ")
-      tagValuePattern = null
+      tagNamePattern = Pattern.compile("tagZ")
 
     when:
       MetricController.collectValues(
         collection, meterA, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == toIdMap([idAYZ : [measureAYZ]])
+      collection == [(idAXZ) : [measureAXZ]]
   }
 
   void "collectFilteredTagValue"() {
     given:
-      collection = new Map<Id, List<Measurement>>();
-      namePattern = null
-      tagNamePattern = null
-      tagValuePattern = Pattern("X")
+      tagValuePattern = Pattern.compile("X")
 
     when:
       MetricController.collectValues(
         collection, meterA, namePattern, tagNamePattern, tagValuePattern)
 
     then:
-      collection == toIdMap([idAXY : [measureAXY],
-                             idAYX : [measureAYX]])
+      collection == [(idAXY) : [measureAXY],
+                     (idAYX) : [measureAYX]]
   }
 
   void "collectNotFound"() {
     given:
-      collection = new Map<Id, List<Measurement>>();
-      namePattern = null
-      tagNamePattern = Pattern("tagZ")
-      tagValuePattern = Pattern("X")
+      tagNamePattern = Pattern.compile("tagZ")
+      tagValuePattern = Pattern.compile("X")
 
     when:
       MetricController.collectValues(
@@ -207,4 +188,52 @@ class MetricControllerSpec extends Specification {
     then:
       collection == toIdMap([:])
   }
+
+  void "meterToKind"() {
+    given:
+      String kind
+
+    when:
+      kind = MetricController.meterToKind(new DefaultCounter(clock, idAXY))
+    then:
+      kind.equals("Counter")
+
+    when:
+      kind = MetricController.meterToKind(new DefaultTimer(clock, idAXY))
+    then:
+      kind.equals("Timer")
+
+    when:
+      kind = MetricController.meterToKind(meterA)
+    then:
+      kind.equals("MetricControllerSpec\$TestMeter")
+  }
+
+/***
+  void "encodeSimpleRegistry"() {
+    given:
+      MetricController.EncodedRegistry got
+      MetricController.EncodedRegistry expect
+      DefaultRegistry registry = new DefaultRegistry(clock)
+      Meter counter = new DefaultCounter(clock, idAXY)
+      counter.increment(4)
+
+      List<MetricController.TaggedDataPoints> expected_tagged_data_points = [
+          new MetricController.TaggedDataPoints(
+              [new MetricController.TagValue("tagA", "X"),
+               new MetricController.TagValue("tagB", "Y")],
+              [new MetricController.DataPoint(millis, 4)])
+      ]
+      registry.register(counter)
+
+
+    when:
+      got = controller.encodeRegistry(
+          registry, namePattern, tagNamePattern, tagValuePattern)
+
+    then:
+     System.out.println(" GOT " + got.get("idA"));
+      got == ["idA" : new MetricController.MetricValues("Counter", expected_tagged_data_points)]   
+  }
+***/
 }
