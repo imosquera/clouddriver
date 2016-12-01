@@ -20,6 +20,7 @@ import com.amazonaws.services.elasticloadbalancing.model.DescribeInstanceHealthR
 import com.amazonaws.services.elasticloadbalancing.model.LoadBalancerNotFoundException
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
+import com.google.common.util.concurrent.RateLimiter
 import com.netflix.spinnaker.cats.agent.AccountAware
 import com.netflix.spinnaker.cats.agent.AgentDataType
 import com.netflix.spinnaker.cats.agent.CacheResult
@@ -103,8 +104,12 @@ class AmazonLoadBalancerInstanceStateCachingAgent implements CachingAgent,Health
 
     Collection<CacheData> lbHealths = []
     Collection<CacheData> instances = []
+    RateLimiter apiRequestRateLimit = RateLimiter.create(4.0);
+
+    log.info("Querying load balancing items");
     for (loadBalancerKey in loadBalancerKeys) {
       try {
+        apiRequestRateLimit.acquire()
         Map<String, String> idObj = Keys.parse(loadBalancerKey)
         def lbName = idObj.loadBalancer
         def result = loadBalancing.describeInstanceHealth(new DescribeInstanceHealthRequest(lbName))
