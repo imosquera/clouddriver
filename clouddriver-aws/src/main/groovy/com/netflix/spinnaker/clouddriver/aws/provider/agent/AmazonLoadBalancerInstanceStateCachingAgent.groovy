@@ -108,7 +108,6 @@ class AmazonLoadBalancerInstanceStateCachingAgent implements CachingAgent,Health
     Collection<CacheData> instances = []
     RateLimiter apiRequestRateLimit = RateLimiter.create(rateLimit);
 
-    log.info("Querying load balancing items");
     for (loadBalancerKey in loadBalancerKeys) {
       try {
         apiRequestRateLimit.acquire()

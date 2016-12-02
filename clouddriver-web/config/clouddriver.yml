@@ -49,9 +49,7 @@ default:
     env: default
 
 aws:
-  enabled: ${AWS_ENABLED:true}
-  client:
-    maxConnections: 1
+  enabled: ${AWS_ENABLED:false}
   # proxy:
   #  proxyHost: 10.0.0.54
   #  proxyPort: 8888

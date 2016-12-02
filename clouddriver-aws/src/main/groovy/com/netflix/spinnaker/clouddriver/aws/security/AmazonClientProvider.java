@@ -382,7 +382,6 @@ public class AmazonClientProvider {
     } catch (Exception e) {
       throw new RuntimeException("Instantiation of client implementation failed!", e);
     }
-
   }
 
   protected <T extends AmazonWebServiceClient> T getClient(Class<T> impl, AWSCredentialsProvider awsCredentialsProvider, String region) {
@@ -391,7 +390,7 @@ public class AmazonClientProvider {
       Constructor<T> constructor = impl.getConstructor(AWSCredentialsProvider.class, ClientConfiguration.class);
 
       ClientConfiguration clientConfiguration = new ClientConfiguration();
-      clientConfiguration.setMaxConnections(1);
+
       if (awsCredentialsProvider instanceof NetflixSTSAssumeRoleSessionCredentialsProvider) {
         RetryPolicy.RetryCondition delegatingRetryCondition = (originalRequest, exception, retriesAttempted) -> {
           NetflixSTSAssumeRoleSessionCredentialsProvider stsCredentialsProvider = (NetflixSTSAssumeRoleSessionCredentialsProvider) awsCredentialsProvider;
