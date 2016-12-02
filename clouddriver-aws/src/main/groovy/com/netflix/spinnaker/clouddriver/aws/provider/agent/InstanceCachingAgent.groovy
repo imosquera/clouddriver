@@ -23,6 +23,7 @@ import com.amazonaws.services.ec2.model.StateReason
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
+import com.google.common.util.concurrent.RateLimiter
 import com.netflix.spectator.api.Registry
 import com.netflix.spinnaker.cats.agent.AccountAware
 import com.netflix.spinnaker.cats.agent.AgentDataType
@@ -61,13 +62,15 @@ class InstanceCachingAgent implements CachingAgent, AccountAware, DriftMetric {
   final String region
   final ObjectMapper objectMapper
   final Registry registry
+  final int rateLimit
 
-  InstanceCachingAgent(AmazonClientProvider amazonClientProvider, NetflixAmazonCredentials account, String region, ObjectMapper objectMapper, Registry registry) {
+  InstanceCachingAgent(AmazonClientProvider amazonClientProvider, NetflixAmazonCredentials account, String region, ObjectMapper objectMapper, Registry registry, rateLimit) {
     this.amazonClientProvider = amazonClientProvider
     this.account = account
     this.region = region
     this.objectMapper = objectMapper.enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
     this.registry = registry
+    this.rateLimit = rateLimit
   }
 
   @Override
@@ -106,10 +109,12 @@ class InstanceCachingAgent implements CachingAgent, AccountAware, DriftMetric {
 
     def amazonEC2 = amazonClientProvider.getAmazonEC2(account, region)
 
+    RateLimiter apiRequestRateLimit = RateLimiter.create(rateLimit);
     Long start = null
     def request = new DescribeInstancesRequest().withMaxResults(500)
     List<Instance> awsInstances = []
     while (true) {
+      apiRequestRateLimit.acquire()
       def resp = amazonEC2.describeInstances(request)
       if (account.eddaEnabled) {
         start = amazonClientProvider.lastModified ?: 0

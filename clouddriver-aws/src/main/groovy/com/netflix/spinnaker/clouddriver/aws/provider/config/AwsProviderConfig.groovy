@@ -22,6 +22,7 @@ import com.netflix.spinnaker.cats.agent.Agent
 import com.netflix.spinnaker.cats.agent.CachingAgent
 import com.netflix.spinnaker.cats.provider.ProviderSynchronizerTypeWrapper
 import com.netflix.spinnaker.clouddriver.aws.AmazonCloudProvider
+import com.netflix.spinnaker.clouddriver.aws.AwsConfigurationProperties
 import com.netflix.spinnaker.clouddriver.aws.provider.agent.AmazonLoadBalancerV2InstanceStateCachingAgent
 import com.netflix.spinnaker.clouddriver.aws.provider.agent.ReservedInstancesCachingAgent
 import com.netflix.spinnaker.clouddriver.aws.security.AmazonClientProvider
@@ -110,7 +111,9 @@ class AwsProviderConfig {
                                                  EddaApiFactory eddaApiFactory,
                                                  ApplicationContext ctx,
                                                  Registry registry,
-                                                 Scheduler reservationReportScheduler) {
+                                                 Scheduler reservationReportScheduler,
+                                                 AwsConfigurationProperties awsConfigProperties
+                                                 ) {
     def scheduledAccounts = ProviderUtils.getScheduledAccounts(awsProvider)
     Set<NetflixAmazonCredentials> allAccounts = ProviderUtils.buildThreadSafeSetOfAccounts(accountCredentialsRepository, NetflixAmazonCredentials)
 
@@ -125,13 +128,13 @@ class AwsProviderConfig {
       for (AmazonCredentials.AWSRegion region : credentials.regions) {
         if (!scheduledAccounts.contains(credentials.name)) {
           newlyAddedAgents << new ClusterCachingAgent(amazonCloudProvider, amazonClientProvider, credentials, region.name, objectMapper, registry)
-          newlyAddedAgents << new LaunchConfigCachingAgent(amazonClientProvider, credentials, region.name, objectMapper, registry)
+          newlyAddedAgents << new LaunchConfigCachingAgent(amazonClientProvider, credentials, region.name, objectMapper, registry, awsConfigProperties.rateLimiter.launchConfigLimit)
           newlyAddedAgents << new ImageCachingAgent(amazonClientProvider, credentials, region.name, objectMapper, registry, false)
           if (!publicRegions.contains(region.name)) {
             newlyAddedAgents << new ImageCachingAgent(amazonClientProvider, credentials, region.name, objectMapper, registry, true)
             publicRegions.add(region.name)
           }
-          newlyAddedAgents << new InstanceCachingAgent(amazonClientProvider, credentials, region.name, objectMapper, registry)
+          newlyAddedAgents << new InstanceCachingAgent(amazonClientProvider, credentials, region.name, objectMapper, registry, awsConfigProperties.rateLimiter.ec2InstanceStateLimit)
           newlyAddedAgents << new LoadBalancerCachingAgent(amazonCloudProvider, amazonClientProvider, credentials, region.name, objectMapper, registry)
           newlyAddedAgents << new ReservedInstancesCachingAgent(amazonClientProvider, credentials, region.name, objectMapper, registry)
 
@@ -139,10 +142,10 @@ class AwsProviderConfig {
             newlyAddedAgents << new EddaLoadBalancerCachingAgent(eddaApiFactory.createApi(credentials.edda, region.name), credentials, region.name, objectMapper)
           } else {
             newlyAddedAgents << new AmazonLoadBalancerInstanceStateCachingAgent(
-              amazonClientProvider, credentials, region.name, objectMapper, ctx
+              amazonClientProvider, credentials, region.name, objectMapper, ctx, awsConfigProperties.rateLimiter.elbInstanceStateLimit
             )
           }
-          newlyAddedAgents << new AmazonLoadBalancerV2InstanceStateCachingAgent(amazonClientProvider, credentials, region.name, objectMapper)
+          newlyAddedAgents << new AmazonLoadBalancerV2InstanceStateCachingAgent(amazonClientProvider, credentials, region.name, objectMapper, awsConfigProperties.rateLimiter.elbV2InstanceStateLimit)
         }
       }
     }

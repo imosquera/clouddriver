@@ -21,6 +21,7 @@ import com.amazonaws.services.autoscaling.model.LaunchConfiguration
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
+import com.google.common.util.concurrent.RateLimiter
 import com.netflix.spectator.api.Registry
 import com.netflix.spinnaker.cats.agent.AccountAware
 import com.netflix.spinnaker.cats.agent.AgentDataType
@@ -54,13 +55,15 @@ class LaunchConfigCachingAgent implements CachingAgent, AccountAware, DriftMetri
   final String region
   final ObjectMapper objectMapper
   final Registry registry
+  final int rateLimit
 
-  LaunchConfigCachingAgent(AmazonClientProvider amazonClientProvider, NetflixAmazonCredentials account, String region, ObjectMapper objectMapper, Registry registry) {
+  LaunchConfigCachingAgent(AmazonClientProvider amazonClientProvider, NetflixAmazonCredentials account, String region, ObjectMapper objectMapper, Registry registry, int rateLimit) {
     this.amazonClientProvider = amazonClientProvider
     this.account = account
     this.region = region
     this.objectMapper = objectMapper.enable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
     this.registry = registry
+    this.rateLimit = rateLimit
   }
 
   @Override
@@ -88,10 +91,12 @@ class LaunchConfigCachingAgent implements CachingAgent, AccountAware, DriftMetri
     log.info("Describing items in ${agentType}")
     def autoScaling = amazonClientProvider.getAutoScaling(account, region)
 
+    RateLimiter apiRequestRateLimit = RateLimiter.create(rateLimit);
     Long start = null
     List<LaunchConfiguration> launchConfigs = []
     def request = new DescribeLaunchConfigurationsRequest()
     while (true) {
+      apiRequestRateLimit.acquire()
       def resp = autoScaling.describeLaunchConfigurations(request)
       if (account.eddaEnabled) {
         start = amazonClientProvider.lastModified ?: 0

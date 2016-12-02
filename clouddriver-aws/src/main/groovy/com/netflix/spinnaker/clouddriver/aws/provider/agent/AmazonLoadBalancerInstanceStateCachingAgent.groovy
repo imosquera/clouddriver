@@ -52,7 +52,7 @@ class AmazonLoadBalancerInstanceStateCachingAgent implements CachingAgent,Health
   final String region
   final ObjectMapper objectMapper
   final ApplicationContext ctx
-
+  final int rateLimit
   private Cache cacheView
   final static String healthId = "aws-load-balancer-instance-health"
 
@@ -60,7 +60,9 @@ class AmazonLoadBalancerInstanceStateCachingAgent implements CachingAgent,Health
   AmazonLoadBalancerInstanceStateCachingAgent(AmazonClientProvider amazonClientProvider,
                                               NetflixAmazonCredentials account, String region,
                                               ObjectMapper objectMapper,
-                                              ApplicationContext ctx) {
+                                              ApplicationContext ctx,
+                                              int rateLimit
+                                              ) {
     this.amazonClientProvider = amazonClientProvider
     this.account = account
     this.region = region
@@ -104,7 +106,7 @@ class AmazonLoadBalancerInstanceStateCachingAgent implements CachingAgent,Health
 
     Collection<CacheData> lbHealths = []
     Collection<CacheData> instances = []
-    RateLimiter apiRequestRateLimit = RateLimiter.create(4.0);
+    RateLimiter apiRequestRateLimit = RateLimiter.create(rateLimit);
 
     log.info("Querying load balancing items");
     for (loadBalancerKey in loadBalancerKeys) {

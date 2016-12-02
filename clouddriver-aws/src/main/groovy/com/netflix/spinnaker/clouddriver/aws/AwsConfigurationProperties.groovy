@@ -33,6 +33,15 @@ class AwsConfigurationProperties {
   }
 
   @Canonical
+  static class RateLimiterConfig {
+    int elbInstanceStateLimit = 100
+    int elbV2InstanceStateLimit = 2
+    int launchConfigLimit = 100
+    int ec2InstanceStateLimit = 1000
+  }
+
+
+  @Canonical
   static class CleanupConfig {
     @Canonical
     static class AlarmsConfig {
@@ -48,7 +57,8 @@ class AwsConfigurationProperties {
   static class MigrationConfig {
     List<String> infrastructureApplications = []
   }
-
+  @NestedConfigurationProperty
+  final RateLimiterConfig rateLimiter = new RateLimiterConfig()
   @NestedConfigurationProperty
   final ClientConfig client = new ClientConfig()
   @NestedConfigurationProperty

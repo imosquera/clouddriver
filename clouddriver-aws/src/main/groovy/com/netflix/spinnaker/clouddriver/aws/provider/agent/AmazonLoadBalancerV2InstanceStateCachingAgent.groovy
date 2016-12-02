@@ -52,12 +52,14 @@ class AmazonLoadBalancerV2InstanceStateCachingAgent implements CachingAgent, Hea
   final String region
   final ObjectMapper objectMapper
   final static String healthId = "aws-load-balancer-v2-instance-health"
+  final int rateLimit;
 
-  AmazonLoadBalancerV2InstanceStateCachingAgent(AmazonClientProvider amazonClientProvider, NetflixAmazonCredentials account, String region, ObjectMapper objectMapper) {
+  AmazonLoadBalancerV2InstanceStateCachingAgent(AmazonClientProvider amazonClientProvider, NetflixAmazonCredentials account, String region, ObjectMapper objectMapper, int rateLimit) {
     this.amazonClientProvider = amazonClientProvider
     this.account = account
     this.region = region
     this.objectMapper = objectMapper
+    this.rateLimit = rateLimit
   }
 
   @Override
@@ -81,7 +83,7 @@ class AmazonLoadBalancerV2InstanceStateCachingAgent implements CachingAgent, Hea
   }
 
   RateLimiter rateLimiter() {
-    return RateLimiter.create(2)
+    return RateLimiter.create(ratelimit)
   }
 
   @Override
